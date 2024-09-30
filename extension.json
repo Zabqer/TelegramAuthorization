@@ -1,0 +1,56 @@
+{
+	"name": "TelegramAuthorization",
+	"author": "Alexey <Zabqer> Gutnik",
+	"url": "https://github.com/zabqer/TelegramAuthorization",
+	"description": "This extension allow use telegram single sign on",
+	"version": "1.0",
+	"type": "other",
+	"license-name": "GPL-2.0-or-later",
+	"manifest_version": 2,
+	"requires": {
+		"MediaWiki": ">= 1.35.3",
+		"extensions": {
+			"PluggableAuth": ">= 7.0"
+		}
+	},
+	"AutoloadNamespaces": {
+		"MediaWiki\\Extension\\TelegramAuthorization\\": "src/"
+	},
+	"callback": "MediaWiki\\Extension\\TelegramAuthorization\\Setup::onRegistration",
+	"Hooks": {
+		"SpecialPageBeforeExecute": "MediaWiki\\Extension\\TelegramAuthorization\\Hooks::onSpecialPageBeforeExecute"
+	},
+	"attributes": {
+		"PluggableAuth": {
+			"TelegramAuthorization": {
+				"class": "MediaWiki\\Extension\\TelegramAuthorization\\Auth",
+				"services": [
+					"MainConfig",
+					"AuthManager",
+					"UserFactory"
+				]
+			}
+		}
+	},
+	"ResourceModules": {
+		"ext.telegramauthorization.special.userlogin.scripts": {
+			"scripts": [
+				"telegramauthorization.special.userlogin.scripts.js"
+			]
+		}
+	},
+	"ResourceFileModulePaths": {
+		"localBasePath": "resources",
+		"remoteExtPath": "TelegramAuthorization"
+	},
+	"config": {
+		"TGAuthBotHash": {
+			"value": "",
+			"descriptionmsg": "Bot SHA256 hash for payload verify"
+		},
+		"TGAuthBotID": {
+			"value": "",
+			"descriptionmsg": "Bot ID for url"
+		}
+	}
+}

@@ -57,6 +57,17 @@ class Auth extends PluggableAuth {
 			return true;
 		}
 
+		if ($tgdata->username == "") {
+			$errorMessage = "Cannot get telegram username!";
+			return false;
+		}
+
+		$user = $this->userFactory->newFromName($tgdata->username);
+		if ($user !== false && $user->getId() !== 0 ) {
+			$errorMessage = "User with this username arleady registered!";
+			return false;
+		}
+
 		$username = $tgdata->username;
 		$this->authManager->setAuthenticationSessionData( self::TELEGRAM_USER_ID_SESSION_KEY, $tgdata->id );
 

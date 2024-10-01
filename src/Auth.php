@@ -14,11 +14,14 @@ use Config;
 class Auth extends PluggableAuth {
 	const TGDATA = "tgdata";
 	private Config $mainConfig;
+	private $telegramUsersStore;
 	private $authManager;
 	private $userFactory;
 	protected $logger = null;
-	public function __construct(Config $mainConfig, AuthManager $authManager, UserFactory $userFactory) {
+	const TELEGRAM_USER_ID_SESSION_KEY = "TelegramUserID";
+	public function __construct(Config $mainConfig, TelegramUsersStore $telegramUsersStore, AuthManager $authManager, UserFactory $userFactory) {
 		$this->mainConfig = $mainConfig;
+		$this->telegramUsersStore = $telegramUsersStore;
 		$this->authManager = $authManager;
 		$this->setLogger(LoggerFactory::getInstance("TelegramAuthorization"));
 		$this->getLogger()->debug("TelegramAuthorization::Auth created");
@@ -49,16 +52,14 @@ class Auth extends PluggableAuth {
 			$errorMessage = "Cannot verify authenticity of telegram data!";
 			return false;
 		}
+		[ $id, $username ] = $this->telegramUsersStore->findUser($tgdata->id);
+		if ( $id !== null ) {
+			return true;
+		}
+
 		$username = $tgdata->username;
-		if ($username === "") {
-			$errorMessage = "Cannot get telegram username";
-			return false;
-		}
-		$username = $username;
-		$user = $this->userFactory->newFromName($username);
-		if ($user !== false && $user->getId() !== 0 ) {
-			$id = $user->getId();
-		}
+		$this->authManager->setAuthenticationSessionData( self::TELEGRAM_USER_ID_SESSION_KEY, $tgdata->id );
+
 		return true;
 	}
 
@@ -84,6 +85,8 @@ class Auth extends PluggableAuth {
 	public function deauthenticate( UserIdentity &$user ): void {
 	}
 	public function saveExtraAttributes( int $id ): void {
+		$telegram_user_id = $this->authManager->getAuthenticationSessionData( self::TELEGRAM_USER_ID_SESSION_KEY );
+		$this->telegramUsersStore->saveExtraAttributes($id, $telegram_user_id);
 	}
 	public static function getExtraLoginFields(): array {
 		return [

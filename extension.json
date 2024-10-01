@@ -18,14 +18,19 @@
 	},
 	"callback": "MediaWiki\\Extension\\TelegramAuthorization\\Setup::onRegistration",
 	"Hooks": {
-		"SpecialPageBeforeExecute": "MediaWiki\\Extension\\TelegramAuthorization\\Hooks::onSpecialPageBeforeExecute"
+		"SpecialPageBeforeExecute": "MediaWiki\\Extension\\TelegramAuthorization\\Hooks::onSpecialPageBeforeExecute",
+		"LoadExtensionSchemaUpdates": "MediaWiki\\Extension\\TelegramAuthorization\\Hooks::onLoadExtensionSchemaUpdates"
 	},
+	"ServiceWiringFiles": [
+		"src/ServiceWiring.php"
+	],
 	"attributes": {
 		"PluggableAuth": {
 			"TelegramAuthorization": {
 				"class": "MediaWiki\\Extension\\TelegramAuthorization\\Auth",
 				"services": [
 					"MainConfig",
+					"TelegramUsersStore",
 					"AuthManager",
 					"UserFactory"
 				]

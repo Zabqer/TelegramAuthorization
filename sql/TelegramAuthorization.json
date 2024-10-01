@@ -1,0 +1,35 @@
+[
+	{
+		"name": "telegram_users",
+		"columns": [
+			{
+				"name": "id",
+				"comment": "User ID",
+				"type": "integer",
+				"options": {
+					"unsigned": true,
+					"notnull": true
+				}
+			},
+			{
+				"name": "tg_id",
+				"comment": "Telegram User ID",
+				"type": "integer",
+				"options": {
+					"unsigned": true,
+					"notnull": true
+				}
+			}
+		],
+		"indexes": [
+			{
+				"name": "id",
+				"columns": [ "id" ],
+				"unique": true
+			}
+		],
+		"pk": [
+			"id"
+		]
+	}
+]

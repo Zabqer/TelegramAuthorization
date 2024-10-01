@@ -19,3 +19,7 @@ git clone https://github.com/Zabqer/TelegramAuthorization
 ```
 wfLoadExtension( 'TelegramAuthorization' );
 ```
+7. Run mediawiki update command to create plugin tables
+```
+php maintenance/update.php
+```

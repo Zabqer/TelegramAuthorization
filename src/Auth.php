@@ -8,6 +8,7 @@ use MediaWiki\Extension\PluggableAuth\PluggableAuthLogin;
 use MediaWiki\User\UserIdentity;
 use MediaWiki\Auth\AuthManager;
 use MediaWiki\User\UserFactory;
+use MediaWiki\Title\TitleFactory;
 use SpecialPage;
 use Config;
 
@@ -17,15 +18,48 @@ class Auth extends PluggableAuth {
 	private $telegramUsersStore;
 	private $authManager;
 	private $userFactory;
+	private $titleFactory;
 	protected $logger = null;
 	const TELEGRAM_USER_ID_SESSION_KEY = "TelegramUserID";
-	public function __construct(Config $mainConfig, TelegramUsersStore $telegramUsersStore, AuthManager $authManager, UserFactory $userFactory) {
+	public function __construct(Config $mainConfig, TelegramUsersStore $telegramUsersStore, AuthManager $authManager, UserFactory $userFactory, TitleFactory $titleFactory) {
 		$this->mainConfig = $mainConfig;
 		$this->telegramUsersStore = $telegramUsersStore;
 		$this->authManager = $authManager;
 		$this->setLogger(LoggerFactory::getInstance("TelegramAuthorization"));
 		$this->getLogger()->debug("TelegramAuthorization::Auth created");
 		$this->userFactory = $userFactory;
+		$this->titleFactory = $titleFactory;
+	}
+
+	public static function transliterate(string $str): string {
+		$transliterationMap = [
+			'А' => 'A',  'Б' => 'B',  'В' => 'V',  'Г' => 'G',  'Д' => 'D',
+			'Е' => 'E',  'Ё' => 'Yo', 'Ж' => 'Zh', 'З' => 'Z',  'И' => 'I',
+			'Й' => 'Y',  'К' => 'K',  'Л' => 'L',  'М' => 'M',  'Н' => 'N',
+			'О' => 'O',  'П' => 'P',  'Р' => 'R',  'С' => 'S',  'Т' => 'T',
+			'У' => 'U',  'Ф' => 'F',  'Х' => 'Kh', 'Ц' => 'Ts', 'Ч' => 'Ch',
+			'Ш' => 'Sh', 'Щ' => 'Shch','Ы' => 'Y',  'Э' => 'E',  'Ю' => 'Yu',
+			'Я' => 'Ya', 'а' => 'a',  'б' => 'b',  'в' => 'v',  'г' => 'g',
+			'д' => 'd',  'е' => 'e',  'ё' => 'yo', 'ж' => 'zh', 'з' => 'z',
+			'и' => 'i',  'й' => 'y',  'к' => 'k',  'л' => 'l',  'м' => 'm',
+			'н' => 'n',  'о' => 'o',  'п' => 'p',  'р' => 'r',  'с' => 's',
+			'т' => 't',  'у' => 'u',  'ф' => 'f',  'х' => 'kh', 'ц' => 'ts',
+			'ч' => 'ch', 'ш' => 'sh', 'щ' => 'shch','ы' => 'y',  'э' => 'e',
+			'ю' => 'yu', 'я' => 'ya'
+		];
+		return strtr($str, $transliterationMap);
+	}
+
+	public static function genUsername(): string {
+		$characters = 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
+		$charactersLen = strlen($characters);
+		$usernameLen = 8;
+
+		$username = "";
+		for ($i = 0; $i < $usernameLen; $i++) {
+			$username .= $characters[rand(0, $charactersLen - 1)];
+		}
+		return $username;
 	}
 
 	public function authenticate( ?int &$id, ?string &$username, ?string &$realname, ?string &$email, ?string &$errorMessage ): bool {
@@ -52,6 +86,10 @@ class Auth extends PluggableAuth {
 			$errorMessage = "Cannot verify authenticity of telegram data!";
 			return false;
 		}
+		if ((time() - $tgdata->auth_date) > 86400) {
+			$errorMessage = "Auth data is outdated!";
+			return false;
+		}
 		[ $id, $username ] = $this->telegramUsersStore->findUser($tgdata->id);
 		if ( $id !== null ) {
 			return true;
@@ -62,13 +100,42 @@ class Auth extends PluggableAuth {
 			return false;
 		}
 
-		$user = $this->userFactory->newFromName($tgdata->username);
-		if ($user !== false && $user->getId() !== 0 ) {
-			$errorMessage = "User with this username arleady registered!";
-			return false;
+
+		$prefferedUsername = $tgdata->username;
+		if ($prefferedUsername == "") {
+			$prefferedUsername = trim($tgdata->first_name . " " . $tgdata->last_name);
+
+			$prefferedUsername = self::transliterate($prefferedUsername);
+
+			$prefferedUsername = preg_replace('/[^a-zA-Z0-9 ]/', '', $prefferedUsername);
+
+			$prefferedUsername = $this->titleFactory->makeTitle( NS_USER, $prefferedUsername );
+
+			$prefferedUsername = $prefferedUsername ? $prefferedUsername->getText() : "";
+
+			if ($prefferedUsername == "") {
+				$prefferedUsername = self::genUsername();
+			}
 		}
 
-		$username = $tgdata->username;
+		$attempts = 0;
+
+		for (; ; ) {
+			if ($attempts > 5) {
+				$errorMessage = "Failed to create username!";
+				return false;
+			}
+			$user = $this->userFactory->newFromName($prefferedUsername);
+			if ($user !== false && $user->getId() !== 0 ) {
+				$prefferedUsername = $prefferedUsername . "_tg";
+				$attempts = $attempts + 1;
+			} else {
+				break;
+			}
+		}
+
+		$username = $prefferedUsername;
+
 		$this->authManager->setAuthenticationSessionData( self::TELEGRAM_USER_ID_SESSION_KEY, $tgdata->id );
 
 		return true;

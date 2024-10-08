@@ -32,7 +32,8 @@
 					"MainConfig",
 					"TelegramUsersStore",
 					"AuthManager",
-					"UserFactory"
+					"UserFactory",
+					"TitleFactory"
 				]
 			}
 		}

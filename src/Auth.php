@@ -63,82 +63,89 @@ class Auth extends PluggableAuth {
 	}
 
 	public function authenticate( ?int &$id, ?string &$username, ?string &$realname, ?string &$email, ?string &$errorMessage ): bool {
-		$loginPage = SpecialPage::getTitleFor("Userlogin");
-		$redirectUrl = $loginPage->getFullURL();
-		$this->getLogger()->debug("TelegramAuthorization::Auth.authenticate");
-		$extraLoginFields = $this->authManager->getAuthenticationSessionData(
-			PluggableAuthLogin::EXTRALOGINFIELDS_SESSION_KEY
-		);
-		$tgdata = $extraLoginFields[static::TGDATA];
-		if ($tgdata === "NOT_SET") {
-			global $wgServer;
-			$serverUrl = parse_url($wgServer);
-			$serverOrigin = $serverUrl["host"];
-			$this->getLogger()->debug($serverOrigin);
-			$this->getLogger()->debug($redirectUrl);
-			header( "Location: https://oauth.telegram.org/auth?bot_id=" . $this->mainConfig->get("TGAuthBotID") . "&origin=" . $serverOrigin. "&embed=1&request_access=write&return_to=" . $redirectUrl );
-			exit();
-			return false;
-		}
-		$tgdata = base64_decode($tgdata);
-		$tgdata = json_decode($tgdata);
-		if (!$this->validateTelegramData($tgdata)) {
-			$errorMessage = "Cannot verify authenticity of telegram data!";
-			return false;
-		}
-		if ((time() - $tgdata->auth_date) > 86400) {
-			$errorMessage = "Auth data is outdated!";
-			return false;
-		}
-		[ $id, $username ] = $this->telegramUsersStore->findUser($tgdata->id);
-		if ( $id !== null ) {
-			return true;
-		}
-
-		if ($tgdata->username == "") {
-			$errorMessage = "Cannot get telegram username!";
-			return false;
-		}
-
-
-		$prefferedUsername = $tgdata->username;
-		if ($prefferedUsername == "") {
-			$prefferedUsername = trim($tgdata->first_name . " " . $tgdata->last_name);
-
-			$prefferedUsername = self::transliterate($prefferedUsername);
-
-			$prefferedUsername = preg_replace('/[^a-zA-Z0-9 ]/', '', $prefferedUsername);
-
-			$prefferedUsername = $this->titleFactory->makeTitle( NS_USER, $prefferedUsername );
-
-			$prefferedUsername = $prefferedUsername ? $prefferedUsername->getText() : "";
-
-			if ($prefferedUsername == "") {
-				$prefferedUsername = self::genUsername();
-			}
-		}
-
-		$attempts = 0;
-
-		for (; ; ) {
-			if ($attempts > 5) {
-				$errorMessage = "Failed to create username!";
+		try {
+			$loginPage = SpecialPage::getTitleFor("Userlogin");
+			$redirectUrl = $loginPage->getFullURL();
+			$this->getLogger()->debug("TelegramAuthorization::Auth.authenticate");
+			$extraLoginFields = $this->authManager->getAuthenticationSessionData(
+				PluggableAuthLogin::EXTRALOGINFIELDS_SESSION_KEY
+			);
+			$tgdata = $extraLoginFields[static::TGDATA];
+			if ($tgdata === "NOT_SET") {
+				global $wgServer;
+				$serverUrl = parse_url($wgServer);
+				$serverOrigin = $serverUrl["host"];
+				$this->getLogger()->debug($serverOrigin);
+				$this->getLogger()->debug($redirectUrl);
+				header( "Location: https://oauth.telegram.org/auth?bot_id=" . $this->mainConfig->get("TGAuthBotID") . "&origin=" . $serverOrigin. "&embed=1&request_access=write&return_to=" . $redirectUrl );
+				exit();
 				return false;
 			}
-			$user = $this->userFactory->newFromName($prefferedUsername);
-			if ($user !== false && $user->getId() !== 0 ) {
-				$prefferedUsername = $prefferedUsername . "_tg";
-				$attempts = $attempts + 1;
-			} else {
-				break;
+			$tgdata = base64_decode($tgdata);
+			$tgdata = json_decode($tgdata);
+			if (!$this->validateTelegramData($tgdata)) {
+				$errorMessage = "Cannot verify authenticity of telegram data!";
+				return false;
 			}
+			if ((time() - $tgdata->auth_date) > 86400) {
+				$errorMessage = "Auth data is outdated!";
+				return false;
+			}
+			[ $id, $username ] = $this->telegramUsersStore->findUser($tgdata->id);
+			if ( $id !== null ) {
+				return true;
+			}
+
+			if ($tgdata->username == "") {
+				$errorMessage = "Cannot get telegram username!";
+				return false;
+			}
+
+
+			$prefferedUsername = $tgdata->username;
+			if ($prefferedUsername == "") {
+				$prefferedUsername = trim($tgdata->first_name . " " . $tgdata->last_name);
+
+				$prefferedUsername = self::transliterate($prefferedUsername);
+
+				$prefferedUsername = preg_replace('/[^a-zA-Z0-9 ]/', '', $prefferedUsername);
+
+				$prefferedUsername = $this->titleFactory->makeTitle( NS_USER, $prefferedUsername );
+
+				$prefferedUsername = $prefferedUsername ? $prefferedUsername->getText() : "";
+
+				if ($prefferedUsername == "") {
+					$prefferedUsername = self::genUsername();
+				}
+			}
+
+			$attempts = 0;
+
+			for (; ; ) {
+				if ($attempts > 5) {
+					$errorMessage = "Failed to create username!";
+					return false;
+				}
+				$user = $this->userFactory->newFromName($prefferedUsername);
+				if ($user !== false && $user->getId() !== 0 ) {
+					$prefferedUsername = $prefferedUsername . "_tg";
+					$attempts = $attempts + 1;
+				} else {
+					break;
+				}
+			}
+
+			$username = $prefferedUsername;
+
+			$this->authManager->setAuthenticationSessionData( self::TELEGRAM_USER_ID_SESSION_KEY, $tgdata->id );
+
+			return true;
+		} catch (Exception $e) {
+			wfDebugLog("Telegram Authorization", "exception" . $e->__toString() . PHP_EOL);
+			$this->getLogger()->error("Exception during authentication: " . $e->__toString());
+			$errorMessage = "Internal error!";
+			return false;
 		}
-
-		$username = $prefferedUsername;
-
-		$this->authManager->setAuthenticationSessionData( self::TELEGRAM_USER_ID_SESSION_KEY, $tgdata->id );
-
-		return true;
 	}
 
 	private function validateTelegramData($tgdata) {

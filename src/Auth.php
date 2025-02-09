@@ -96,12 +96,6 @@ class Auth extends PluggableAuth {
 				return true;
 			}
 
-			if ($tgdata->username == "") {
-				$errorMessage = "Cannot get telegram username!";
-				return false;
-			}
-
-
 			$prefferedUsername = $tgdata->username;
 			if ($prefferedUsername == "") {
 				$prefferedUsername = trim($tgdata->first_name . " " . $tgdata->last_name);
@@ -136,6 +130,11 @@ class Auth extends PluggableAuth {
 			}
 
 			$username = $prefferedUsername;
+
+			if ($username == "") {
+				$errorMessage = "Cannot get username!";
+				return false;
+			}
 
 			$this->authManager->setAuthenticationSessionData( self::TELEGRAM_USER_ID_SESSION_KEY, $tgdata->id );
 

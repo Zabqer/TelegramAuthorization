@@ -51,4 +51,27 @@ class TelegramUsersStore {
 			return [ $row->user_id, $row->user_name ];
 		}
 	}
+
+	public function findTelegramUser( int $id ): ?int {
+		$dbr = $this->loadBalancer->getConnection( DB_REPLICA );
+		$row = $dbr->newSelectQueryBuilder()
+			->select(
+				[
+					'id',
+					'tg_id'
+				]
+			)
+			->from( 'telegram_users' )
+			->where(
+				[
+					'id' => $id,
+				]
+			)
+			->caller( __METHOD__ )->fetchRow();
+		if ( $row === false ) {
+			return null;
+		} else {
+			return $row->tg_id;
+		}
+	}
 }

@@ -77,7 +77,7 @@ class Auth extends PluggableAuth {
 				$serverOrigin = $serverUrl["host"];
 				$this->getLogger()->debug($serverOrigin);
 				$this->getLogger()->debug($redirectUrl);
-				header( "Location: https://oauth.telegram.org/auth?bot_id=" . $this->mainConfig->get("TGAuthBotID") . "&origin=" . $serverOrigin. "&embed=1&request_access=write&return_to=" . $redirectUrl );
+				header( "Location: https://oauth.telegram.org/auth?bot_id=" . $this->mainConfig->get("TelegramAuthorization_BotID") . "&origin=" . $serverOrigin. "&embed=1&request_access=write&return_to=" . $redirectUrl );
 				exit();
 				return false;
 			}
@@ -158,7 +158,7 @@ class Auth extends PluggableAuth {
 		}
 		sort($tgdataRebuild);
 		$tgdataCheckString = implode("\n", $tgdataRebuild);
-		$shaToken = hex2bin($this->mainConfig->get("TGAuthBotHash"));
+		$shaToken = hex2bin($this->mainConfig->get("TelegramAuthorization_BotHash"));
 		$this->getLogger()->debug($tgdataCheckString);
 		$calchash = hash_hmac("sha256", $tgdataCheckString, $shaToken);
 
